@@ -2,7 +2,7 @@ const AWS = require('aws-sdk');
 let connected = [];
 let apigwManagementApi;
 const sender= async (postData,currID)=>{
-    console.log({connected,postData});
+    console.log({connected,action:"sending msg",sender:currID});
     const postCalls = connected.map(async (connectionId) => {
         try {
             if(connectionId!=currID)
