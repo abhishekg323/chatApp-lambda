@@ -1,9 +1,39 @@
+const Dynamo = require("./Dynamo");
 const AWS = require('aws-sdk');
-let connected = [];
+const tableName = process.env.tableName || "chatApp";
 let apigwManagementApi;
-const sender= async (postData,currID)=>{
+
+const addConnection = async event => {
+    const { connectionId} = event.requestContext;
+    const data = {
+        ID: connectionId,
+    };
+    try{
+        await Dynamo.write(data, tableName);
+    }
+    catch(err){
+        console.log(err);
+    }
+    return { message: 'connected' };
+};
+
+const deleteConnection = async event => {
+    const { connectionId} = event.requestContext;
+    try{
+        await Dynamo.delete(connectionId, tableName)
+    }
+    catch(err){
+        console.log(err);
+    }    
+    return { message: 'disconnected' };
+};
+
+
+const sender= async (postData,currID,connected=null)=>{
+    if(!connected)
+        connected = await Dynamo.getAll(tableName);
     console.log({connected,action:"sending msg",sender:currID});
-    const postCalls = connected.map(async (connectionId) => {
+    const postCalls = connected.Items.map(async ({ ID:connectionId }) => {
         try {
             if(connectionId!=currID)
                 await apigwManagementApi.postToConnection({ ConnectionId: connectionId, Data: postData }).promise();
@@ -11,7 +41,7 @@ const sender= async (postData,currID)=>{
           if (e.statusCode === 410) {
             console.log(`Found stale connection, deleting ${connectionId}`);
             let disconnected = connectionId;
-            connected = connected.filter((ele)=>ele!=disconnected);
+            await Dynamo.delete(disconnected,tableName);
           } else {
             console.log(e);
           }
@@ -34,16 +64,16 @@ exports.handler = async (event) => {
         });
     
     if(event.requestContext.routeKey=="$connect"){
-        connected.push(event.requestContext.connectionId);
-        console.log(connected);
-        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Connected, Total Users = "+connected.length});
-        await sender(postData,event.requestContext.connectionId);
+        await addConnection(event);
+        let connected = await Dynamo.getAll(tableName);
+        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Connected, Total Users = "+connected.Items.length});
+        await sender(postData,event.requestContext.connectionId,connected);
     }
     else if (event.requestContext.routeKey=="$disconnect"){
-        let disconnected = event.requestContext.connectionId;
-        connected = connected.filter((ele)=>ele!=disconnected);
-        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Disconnected, Total Users = "+connected.length});
-        await sender(postData,event.requestContext.connectionId);
+        await deleteConnection(event);
+        let connected = await Dynamo.getAll(tableName);
+        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Disconnected, Total Users = "+connected.Items.length});
+        await sender(postData,event.requestContext.connectionId,connected);
         
     }else if(event.requestContext.routeKey=="send"){
         const postData = JSON.parse(event.body).data;
