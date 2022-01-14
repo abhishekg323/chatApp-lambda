@@ -21,7 +21,7 @@ const Dynamo = {
         return data.Item;
     },
     async getAll(TableName){
-        const params = { TableName, ProjectionExpression: 'ID' };
+        const params = { TableName/*, ProjectionExpression: 'ID'*/ };
         const connectionData = await documentClient.scan(params).promise();
         return connectionData;
     },

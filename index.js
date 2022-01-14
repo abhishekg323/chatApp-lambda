@@ -5,8 +5,10 @@ let apigwManagementApi;
 
 const addConnection = async event => {
     const { connectionId} = event.requestContext;
+    const name = event.queryStringParameters?.name || "unnamed"; 
     const data = {
         ID: connectionId,
+        name,
     };
     try{
         await Dynamo.write(data, tableName);
@@ -32,7 +34,7 @@ const deleteConnection = async event => {
 const sender= async (postData,currID,connected=null)=>{
     if(!connected)
         connected = await Dynamo.getAll(tableName);
-    console.log({connected,action:"sending msg",sender:currID});
+    // console.log({connected,action:"sending msg",sender:currID});
     const postCalls = connected.Items.map(async ({ ID:connectionId }) => {
         try {
             if(connectionId!=currID)
@@ -64,15 +66,32 @@ exports.handler = async (event) => {
         });
     
     if(event.requestContext.routeKey=="$connect"){
+        // console.log(event);
         await addConnection(event);
         let connected = await Dynamo.getAll(tableName);
-        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Connected, Total Users = "+connected.Items.length});
+        const name = event.queryStringParameters?.name; 
+        let msg;
+        if(!name)
+            msg = "An Unnamed User Connected, Total Users = "+connected.Items.length;
+        else
+            msg = `${name} has Joined The Chat, Total Users = ${connected.Items.length}`;
+        let postData=JSON.stringify({name:"System",role:"sys",msg});
         await sender(postData,event.requestContext.connectionId,connected);
     }
     else if (event.requestContext.routeKey=="$disconnect"){
-        await deleteConnection(event);
         let connected = await Dynamo.getAll(tableName);
-        let postData=JSON.stringify({name:"System",role:"sys",msg:"A User Disconnected, Total Users = "+connected.Items.length});
+        let curUser=connected.Items.filter(({ID})=>ID==event.requestContext.connectionId)
+        // console.log("disconnected\n",connected.Items,"\n",connected.Items[0]);
+        // console.log({curUser});
+        let name=curUser[0].name || "unnamed";
+        let msg;
+        if(name=="unnamed")
+            msg = "An Unnamed User Disconnected, Total Users = "+(connected.Items.length-1);
+        else
+            msg = `${name} has Left The Chat, Total Users = ${connected.Items.length-1}`;
+        
+        await deleteConnection(event);
+        let postData=JSON.stringify({name:"System",role:"sys",msg});
         await sender(postData,event.requestContext.connectionId,connected);
         
     }else if(event.requestContext.routeKey=="send"){
