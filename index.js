@@ -97,6 +97,12 @@ exports.handler = async (event) => {
     }else if(event.requestContext.routeKey=="send"){
         const postData = JSON.parse(event.body).data;
         await sender(postData,event.requestContext.connectionId);
+    }else if(event.requestContext.routeKey=="stats"){
+        let connected = await Dynamo.getAll(tableName);
+        const postData = JSON.stringify({name:"System",role:"sys",users:connected.Items.length,msg:`Total Users = ${connected.Items.length}`,reason:"FIRST"});
+        connected.Items = [{ID:event.requestContext.connectionId}];
+        await sender(postData,null,connected);
+        
     }
     const response = {
         statusCode: 200,
