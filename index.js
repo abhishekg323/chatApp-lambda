@@ -91,7 +91,7 @@ exports.handler = async (event) => {
             msg = `${name} has Left The Chat, Total Users = ${connected.Items.length-1}`;
         
         await deleteConnection(event);
-        let postData=JSON.stringify({name:"System",role:"sys",msgusers:connected.Items.length-1,reason:"DISCONNECTED"});
+        let postData=JSON.stringify({name:"System",role:"sys",msg,users:connected.Items.length-1,reason:"DISCONNECTED"});
         await sender(postData,event.requestContext.connectionId,connected);
         
     }else if(event.requestContext.routeKey=="send"){
